@@ -1,0 +1,3 @@
+radio,mcc,net,area,cell,unit,lon,lat,range,samples,changeable,created,updated,averageSignal
+GSM,214,7,2816,3573,0,-3.720627,40.424058,7353,111,1,1290335647,1709434922,0
+GSM,270,77,3,1351,0,6.015509,49.519013,4833,103,1,1310700430,1709444248,0
