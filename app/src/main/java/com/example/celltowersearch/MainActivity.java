@@ -14,13 +14,33 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Collections;
+
+class Tower {
+
+    double latitude;
+    double longitude;
+    double mcc;
+    double mnc;
+    double lac;
+    double cell;
+    double range;
+
+    Tower(double latitude, double longitude, double mcc, double mnc, double lac, double cell, double range) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.mcc = mcc;
+        this.mnc = mnc;
+        this.lac = lac;
+        this.cell = cell;
+        this.range = range;
+
+    }
+}
 
 public class MainActivity extends AppCompatActivity {
     private EditText searchEditText;
     private Button searchButton;
-
-    private ArrayList<Double> latitudes;
+    private ArrayList<Tower> towers;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,60 +50,58 @@ public class MainActivity extends AppCompatActivity {
         searchEditText = findViewById(R.id.name);
         searchButton = findViewById(R.id.save);
 
-        // First off all I want to read the data which is present in the csv file then from there ...
-        latitudes = readCSVFile();
-
-        searchButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                String query = searchEditText.getText().toString().trim();
-                if (!query.isEmpty()) {
-                    // Calling the Binary Search on the data present in the latitudes array list if present it will return the true otherwise false
-                    long startTime = System.currentTimeMillis();
-                    boolean found = binarySearchLatitude(query);
-                    long endTime = System.currentTimeMillis();
-                    if (found) {
-                        double range = getRangeFromLatitude(query);
-                        Toast.makeText(MainActivity.this, "Latitude " + query + " is present in the file with range: " + range, Toast.LENGTH_SHORT).show();
+        towers = readCSVFile();
+                    double latitude = 20.3488139;
+                    double longitude = 85.8163151; // Example longitude, change as needed
+                    double[] location = {latitude, longitude};
+                    Tower nearestTower = findNearestTower(location, towers);
+                    if (nearestTower != null) {
+                        Log.d("Nearest Tower", "Latitude: " + nearestTower.latitude + " Log: " + nearestTower.longitude + " mcc: " + nearestTower.mcc + " mnc: " + nearestTower.mnc + " lac: " + nearestTower.lac + " cellid: " + nearestTower.cell + " range: " + nearestTower.range);
+                        Toast.makeText(MainActivity.this, "Nearest Tower: Latitude=" + nearestTower.latitude + ", Longitude=" + nearestTower.longitude, Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(MainActivity.this, "Latitude " + query + " is not present in the file", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "No towers found", Toast.LENGTH_SHORT).show();
                     }
-                    long timeTaken = endTime - startTime;
-                    Log.d("Search Time", "Time taken for search: " + timeTaken + " milliseconds");
-                } else {
-                    Toast.makeText(MainActivity.this, "Please enter a latitude value to search", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+
+
+
     }
-//    private boolean binarySearchLatitude(String query) {
-//        int low = 0;
-//        int high = latitudes.size() - 1;
-//
-//        while (low <= high) {
-//            int mid = low + (high - low) / 2;
-//            double midValue = latitudes.get(mid);
-//
-//            if (midValue == Double.parseDouble(query)) {
-//                return true;
-//            } else if (midValue < Double.parseDouble(query)) {
-//                low = mid + 1;
-//            } else {
-//                high = mid - 1;
-//            }
-//        }
-//
-//        return false;
+
+    static double euclideanDistance(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371; // Earth radius in kilometers
+
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = R * c;
+
+        return distance;
+    }
+
+//    static double euclideanDistance(double x1, double y1, double x2, double y2) {
+//        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 //    }
+    static Tower findNearestTower(double[] location, ArrayList<Tower> towers) {
+        double minDistance = Double.POSITIVE_INFINITY;
+        Tower nearestTower = null;
 
+//        Toast.makeText(MainActivity.this, towers.size(), Toast.LENGTH_SHORT).show();
+        Log.d("Len","Length"+towers.size());
+        for (Tower tower : towers) {
+            double distance = euclideanDistance(location[0], location[1], tower.latitude, tower.longitude);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestTower = tower;
+            }
+        }
 
-    private boolean binarySearchLatitude(String query) {
-        Collections.sort(latitudes);
-        int index = Collections.binarySearch(latitudes, Double.parseDouble(query));
-        return index >= 0;
+        return nearestTower;
     }
 
-    private double getRangeFromLatitude(String query) {
+    private ArrayList<Tower> readCSVFile() {
+        ArrayList<Tower> towers = new ArrayList<>();
         try {
             InputStream inputStream = getAssets().open("cell_towers.csv");
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -92,14 +110,19 @@ public class MainActivity extends AppCompatActivity {
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
 
-                if (data.length > 0) {
+                if (data.length >= 9) { // Ensure that there are at least 9 columns
                     try {
                         double latitude = Double.parseDouble(data[7]);
-                        if (Double.parseDouble(query) == latitude) {
-                            return Double.parseDouble(data[8]);  // As We know We have 7 col is the lat so If range match we just give the corresponding range
-                        }
+                        double mcc = Double.parseDouble(data[1]);
+                        double mnc = Double.parseDouble(data[2]);
+                        double lac = Double.parseDouble(data[3]);
+                        double cell = Double.parseDouble(data[4]);
+                        double range = Double.parseDouble(data[8]);
+                        double longitude = Double.parseDouble(data[6]);
+
+                        towers.add(new Tower(latitude, longitude, mcc, mnc, lac, cell, range));
                     } catch (NumberFormatException e) {
-                        Log.e("CSV Data", "Error parsing latitude: " + data[7]);
+                        Log.e("CSV Data", "Error parsing latitude or longitude: " + e.getMessage());
                     }
                 }
             }
@@ -107,33 +130,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return -1;
-    }
-
-    private ArrayList<Double> readCSVFile() {
-        ArrayList<Double> latitudes = new ArrayList<>();
-        try {
-            InputStream inputStream = getAssets().open("cell_towers.csv");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                String[] data = line.split(",");
-
-                if (data.length > 0) {
-                    try {
-                        double latitude = Double.parseDouble(data[7]);
-                        latitudes.add(latitude);
-//                        Log.d("CSV Data", "Latitude: " + latitude);
-                    } catch (NumberFormatException e) {
-                        Log.e("CSV Data", "Error parsing latitude: " + data[7]);
-                    }
-                }
-            }
-            reader.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return latitudes;
+        return towers;
     }
 }
